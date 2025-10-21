@@ -10,7 +10,6 @@ const IMPLEMENTATIONS = {
   'go-fiber': { port: 8080, path: 'src/go-fiber', startCmd: 'go run .' },
   'python-fastapi-granian': { port: 8000, path: 'src/python-fastapi', startCmd: 'DB_POOL_MIN=5 DB_POOL_MAX=5 uv run start_server_granian.py' },
   'python-fastapi-uvicorn': { port: 8000, path: 'src/python-fastapi', startCmd: 'uv run start_server.py' },
-  // 'python-fastapi': { port: 8000, path: 'src/python-fastapi', startCmd: 'uv run fastapi run --workers 11 src/main.py' },
   'js-bun-native': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun-native.js' },
   'js-bun-express+bunpg': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun.js' },
   'js-bun-express': { port: 3000, path: 'src/js-express', startCmd: 'PG_POOL_MAX=90 bun run src/main.js' },
@@ -19,18 +18,18 @@ const IMPLEMENTATIONS = {
 };
 
 const TEST_CONFIGS = [
-  // { name: 'read_light', type: 'read', vus: 50, duration: '30s' },
-  // { name: 'read_medium', type: 'read', vus: 200, duration: '30s' },
-  // { name: 'read_heavy', type: 'read', vus: 500, duration: '30s' },
-  // { name: 'read_extreme', type: 'read', vus: 1000, duration: '30s' },
-  // { name: 'write_light', type: 'write', vus: 50, duration: '30s' },
-  // { name: 'write_medium', type: 'write', vus: 200, duration: '30s' },
-  // { name: 'write_heavy', type: 'write', vus: 500, duration: '30s' },
-  // { name: 'write_extreme', type: 'write', vus: 1000, duration: '30s' },
-  { name: 'mixed_light', type: 'mixed', vus: 50, duration: '30s' },
-  { name: 'mixed_medium', type: 'mixed', vus: 200, duration: '30s' },
-  { name: 'mixed_heavy', type: 'mixed', vus: 500, duration: '30s' },
-  { name: 'mixed_extreme', type: 'mixed', vus: 1000, duration: '30s' },
+  { name: 'read_light', type: 'read', vus: 50, duration: '1m' },
+  { name: 'read_medium', type: 'read', vus: 200, duration: '1m' },
+  { name: 'read_heavy', type: 'read', vus: 500, duration: '1m' },
+  { name: 'read_extreme', type: 'read', vus: 1000, duration: '1m' },
+  { name: 'write_light', type: 'write', vus: 50, duration: '1m' },
+  { name: 'write_medium', type: 'write', vus: 200, duration: '1m' },
+  { name: 'write_heavy', type: 'write', vus: 500, duration: '1m' },
+  { name: 'write_extreme', type: 'write', vus: 1000, duration: '1m' },
+  { name: 'mixed_light', type: 'mixed', vus: 50, duration: '1m' },
+  { name: 'mixed_medium', type: 'mixed', vus: 200, duration: '1m' },
+  { name: 'mixed_heavy', type: 'mixed', vus: 500, duration: '1m' },
+  { name: 'mixed_extreme', type: 'mixed', vus: 1000, duration: '1m' },
 ];
 
 const DEFAULT_CREDENTIALS = {
