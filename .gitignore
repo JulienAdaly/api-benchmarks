@@ -6,6 +6,7 @@ target
 **/*.csv
 **/*.json
 !.devcontainer/devcontainer.json
+!*package.json
 **/*.txt
 **/*.md
 !**/README.md
