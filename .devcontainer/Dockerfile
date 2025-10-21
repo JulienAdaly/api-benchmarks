@@ -33,6 +33,17 @@ ENV RUSTUP_TOOLCHAIN=stable
 ENV PATH="$HOME/.cargo/bin:$PATH"
 RUN /root/.cargo/bin/rustup update stable
 
-# Install GitHub CLI
+# Install Go
 
-RUN sudo apt update && sudo apt install gh
+RUN curl -LO https://go.dev/dl/go1.25.3.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go1.25.3.linux-amd64.tar.gz \
+    && rm go1.25.3.linux-amd64.tar.gz
+
+ENV PATH="/usr/local/go/bin:$PATH"
+
+# Install Grafana k6
+
+RUN curl -LO https://github.com/grafana/k6/releases/download/v1.3.0/k6-v1.3.0-linux-amd64.tar.gz && \
+    tar -xzf k6-v1.3.0-linux-amd64.tar.gz && \
+    mv k6-v1.3.0-linux-amd64/k6 /usr/local/bin/ && \
+    rm -rf k6-v1.3.0-linux-amd64 k6-v1.3.0-linux-amd64.tar.gz
