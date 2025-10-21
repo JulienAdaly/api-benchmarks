@@ -1,0 +1,30 @@
+{
+    "name": "API Benchmarks",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "forwardPorts": [11434],
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "mws-vscode.live-server",
+          "ms-vscode-remote.remote-containers",
+        ],
+        "settings": {
+          "terminal.integrated.defaultProfile.linux": "zsh"
+        }
+      }
+    },
+    "remoteUser": "root",
+    "mounts": [
+      "source=${localWorkspaceFolderBasename}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+      "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind",
+      "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind"
+    ],
+    "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:2": {
+        "moby": false
+      }
+    }
+  }
+  
