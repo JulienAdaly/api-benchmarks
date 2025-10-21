@@ -93,11 +93,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-// Helper function to print admin password hash (like Python version)
-#[allow(dead_code)]
-async fn print_admin_hash() {
-    if let Ok(hash) = auth::hash_password("admin").await {
-        println!("{}", hash);
-    }
-}
