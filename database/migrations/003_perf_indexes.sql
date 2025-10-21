@@ -15,3 +15,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_post_likes_post
 -- Paginate "recent posts" globally
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_posts_created_at
   ON posts(created_at DESC);
+
+-- Users pagination by creation time
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_created_at
+  ON users(created_at DESC);
