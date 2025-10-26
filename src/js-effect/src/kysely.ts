@@ -19,10 +19,14 @@ class DatabaseLive extends Effect.Service<DatabaseLive>()('DatabaseLive', {
     const maxConnections = yield* Config.number('DB_POOL_MAX').pipe(
       Config.withDefault(20)
     );
+    const minConnections = yield* Config.number('DB_POOL_MIN').pipe(
+      Config.withDefault(10)
+    );
     const dialect = new PostgresDialect({
       pool: new Pool({
         connectionString,
         max: maxConnections,
+        min: minConnections,
       }),
     });
     return yield* Effect.acquireRelease(
