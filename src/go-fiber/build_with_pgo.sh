@@ -30,7 +30,7 @@ echo "Step 1: Building instrumented binary..."
 go build -o go-fiber-profiling
 
 # Step 2: Prepare environment
-DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/postgres}"
+DATABASE_URL="${DATABASE_URL:-postgresql://apibench:apibench_password@localhost:15432/apibench}"
 JWT_SECRET="${JWT_SECRET:-secret}"
 PORT="${PORT:-8080}"
 
