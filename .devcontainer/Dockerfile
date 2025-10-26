@@ -35,9 +35,9 @@ RUN /root/.cargo/bin/rustup update stable
 
 # Install Go
 
-RUN curl -LO https://go.dev/dl/go1.25.3.linux-amd64.tar.gz \
-    && tar -C /usr/local -xzf go1.25.3.linux-amd64.tar.gz \
-    && rm go1.25.3.linux-amd64.tar.gz
+RUN curl -LO https://go.dev/dl/go1.25.3.linux-arm64.tar.gz \
+    && tar -C /usr/local -xzf go1.25.3.linux-arm64.tar.gz \
+    && rm go1.25.3.linux-arm64.tar.gz
 
 ENV PATH="/usr/local/go/bin:$PATH"
 
