@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime/pprof"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
-	"encoding/hex"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -272,12 +275,34 @@ func uuidFrom16Bytes(b []byte) string {
 }
 
 func main() {
+	// Enable CPU profiling if requested
+	if os.Getenv("CPU_PROFILE") != "" {
+		f, err := os.Create(os.Getenv("CPU_PROFILE"))
+		if err != nil {
+			log.Fatalf("could not create CPU profile: %v", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatalf("could not start CPU profile: %v", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	if DATABASE_URL == "" || JWT_SECRET == "" {
 		log.Fatal("DATABASE_URL and JWT_SECRET must be set")
 	}
 	mustLoadSQL()
 
-	pool, err := pgxpool.New(context.Background(), DATABASE_URL)
+	config, err := pgxpool.ParseConfig(DATABASE_URL)
+	if err != nil {
+		log.Fatalf("failed to parse db config: %v", err)
+	}
+	config.MaxConns = 50
+	config.MinConns = 10
+	config.MaxConnIdleTime = 300 * time.Second
+	config.MaxConnLifetime = 1800 * time.Second
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Fatalf("failed to create db pool: %v", err)
 	}
@@ -645,7 +670,28 @@ func main() {
 		port = "8080"
 	}
 	addr := ":" + port
-	if err := app.Listen(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("server error: %v", err)
+
+	// Create a channel to listen for interrupts
+	graceful := make(chan os.Signal, 1)
+	signal.Notify(graceful, os.Interrupt, syscall.SIGTERM)
+
+	// Start server in a goroutine
+	go func() {
+		if err := app.Listen(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-graceful
+	log.Println("Shutting down gracefully...")
+
+	// Gracefully shutdown the server
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := app.ShutdownWithContext(ctx); err != nil {
+		log.Printf("Shutdown error: %v", err)
 	}
+
+	log.Println("Server stopped")
 }
