@@ -2,39 +2,74 @@
 
 import { spawn } from 'child_process';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { resolve } from 'path';
 
 // Configuration
 const IMPLEMENTATIONS = {
-  'rust-axum': { port: 8080, path: 'src/rust-axum', startCmd: 'cargo run --release' },
-  'go-fiber': { port: 8080, path: 'src/go-fiber', startCmd: 'go run .' },
-  'python-fastapi-granian': { port: 8000, path: 'src/python-fastapi', startCmd: 'DB_POOL_MIN=5 DB_POOL_MAX=5 uv run start_server_granian.py' },
-  'python-fastapi-uvicorn': { port: 8000, path: 'src/python-fastapi', startCmd: 'uv run start_server.py' },
-  'js-bun-native': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun-native.js' },
-  'js-bun-express+bunpg': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun.js' },
-  'js-bun-express': { port: 3000, path: 'src/js-express', startCmd: 'PG_POOL_MAX=90 bun run src/main.js' },
-  "js-node-express": { port: 3000, path: 'src/js-express', startCmd: 'NODE_OPTIONS="--max-old-space-size=16384" UV_THREADPOOL_SIZE=16 PG_POOL_MAX=90 node src/main.js' }
-
+  // 'js-effect': {
+  //   port: 3010,
+  //   path: 'src/js-effect',
+  //   startCmd: 'bun run dist/main.js',
+  // },
+  'go-fiber': { port: 8081, path: 'src/go-fiber', startCmd: './go-fiber' },
+  // 'python-fastapi-granian': { port: 8000, path: 'src/python-fastapi', startCmd: 'DB_POOL_MIN=5 DB_POOL_MAX=5 uv run start_server_granian.py' },
+  // 'python-fastapi-uvicorn': {
+  //   port: 8000,
+  //   path: 'src/python-fastapi',
+  //   startCmd: 'uv run start_server.py',
+  // },
+  // 'js-bun-native': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun-native.js' },
+  // 'js-bun-express+bunpg': {
+  //   port: 3000,
+  //   path: 'src/js-express',
+  //   startCmd: 'bun run src/main-bunpg.js',
+  // },
+  'js-bun-express': {
+    port: 3005,
+    path: 'src/js-express',
+    startCmd: 'bun run src/main.js',
+  },
+  'rust-axum': {
+    port: 8080,
+    path: 'src/rust-axum',
+    startCmd: './target/release/rust-axum-api',
+  },
+  // 'js-bun-native-server+pg': {
+  //   port: 3010,
+  //   path: 'src/js-express',
+  //   startCmd: 'bun run src/main-bun-native-pg.js',
+  // },
+  // 'js-bun-fastify': {
+  //   port: 3000,
+  //   path: 'src/js-express',
+  //   startCmd: 'bun run src/main-fastify.js',
+  // },
+  // 'js-node-express': {
+  //   port: 3000,
+  //   path: 'src/js-express',
+  //   startCmd:
+  //     'NODE_OPTIONS="--max-old-space-size=16384" UV_THREADPOOL_SIZE=16 node src/main.js',
+  // },
 };
 
 const TEST_CONFIGS = [
-  { name: 'read_light', type: 'read', vus: 50, duration: '1m' },
-  { name: 'read_medium', type: 'read', vus: 200, duration: '1m' },
-  { name: 'read_heavy', type: 'read', vus: 500, duration: '1m' },
-  { name: 'read_extreme', type: 'read', vus: 1000, duration: '1m' },
-  { name: 'write_light', type: 'write', vus: 50, duration: '1m' },
-  { name: 'write_medium', type: 'write', vus: 200, duration: '1m' },
-  { name: 'write_heavy', type: 'write', vus: 500, duration: '1m' },
-  { name: 'write_extreme', type: 'write', vus: 1000, duration: '1m' },
-  { name: 'mixed_light', type: 'mixed', vus: 50, duration: '1m' },
-  { name: 'mixed_medium', type: 'mixed', vus: 200, duration: '1m' },
-  { name: 'mixed_heavy', type: 'mixed', vus: 500, duration: '1m' },
-  { name: 'mixed_extreme', type: 'mixed', vus: 1000, duration: '1m' },
+  // { name: 'read_light', type: 'read', vus: 50, duration: '1m' },
+  // { name: 'read_medium', type: 'read', vus: 200, duration: '1m' },
+  // { name: 'read_heavy', type: 'read', vus: 500, duration: '1m' },
+  // { name: 'read_extreme', type: 'read', vus: 1000, duration: '1m' },
+  // { name: 'write_light', type: 'write', vus: 50, duration: '1m' },
+  // { name: 'write_medium', type: 'write', vus: 200, duration: '1m' },
+  // { name: 'write_heavy', type: 'write', vus: 500, duration: '1m' },
+  // { name: 'write_extreme', type: 'write', vus: 1000, duration: '1m' },
+  { name: 'mixed_light', type: 'mixed', vus: 50, duration: '20s' },
+  // { name: 'mixed_medium', type: 'mixed', vus: 200, duration: '1m' },
+  // { name: 'mixed_heavy', type: 'mixed', vus: 500, duration: '1m' },
+  // { name: 'mixed_extreme', type: 'mixed', vus: 1000, duration: '1m' },
 ];
 
 const DEFAULT_CREDENTIALS = {
   email: 'admin@admin.fr',
-  password: 'admin'
+  password: 'admin',
 };
 
 // Utility functions
@@ -52,7 +87,10 @@ function parseDotenv(content) {
     if (eqIndex === -1) return;
     const key = trimmed.slice(0, eqIndex).trim();
     let value = trimmed.slice(eqIndex + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     env[key] = value;
@@ -67,12 +105,12 @@ function loadEnvForImplementation(implAbsPath) {
   if (existsSync(rootEnvPath)) {
     try {
       merged = { ...merged, ...parseDotenv(readFileSync(rootEnvPath, 'utf8')) };
-    } catch { }
+    } catch {}
   }
   if (existsSync(implEnvPath)) {
     try {
       merged = { ...merged, ...parseDotenv(readFileSync(implEnvPath, 'utf8')) };
-    } catch { }
+    } catch {}
   }
   return merged;
 }
@@ -86,7 +124,7 @@ function parseArgs() {
     warmup: true,
     parallel: false,
     email: DEFAULT_CREDENTIALS.email,
-    password: DEFAULT_CREDENTIALS.password
+    password: DEFAULT_CREDENTIALS.password,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -120,7 +158,6 @@ function parseArgs() {
       case '-h':
         printUsage();
         process.exit(0);
-        break;
     }
   }
 
@@ -143,29 +180,33 @@ Usage: node scripts/k6/benchmark_runner.mjs [options]
 
 Options:
   -i, --implementations <list>  Comma-separated list of implementations to test
-                               Available: ${Object.keys(IMPLEMENTATIONS).join(', ')}
+                               Available: ${Object.keys(IMPLEMENTATIONS).join(
+                                 ', '
+                               )}
                                Default: all implementations
-  
+
   -t, --tests <list>           Comma-separated list of test configurations
-                               Available: ${TEST_CONFIGS.map(t => t.name).join(', ')}
+                               Available: ${TEST_CONFIGS.map(t => t.name).join(
+                                 ', '
+                               )}
                                Default: all tests
-  
+
   -o, --output <dir>           Output directory for results (default: benchmark_results)
-  
+
   --no-warmup                  Skip warmup phase
   --parallel                   Run implementations in parallel (requires different ports)
   --email <email>              User email for authentication
   --password <password>        User password for authentication
-  
+
   -h, --help                   Show this help
 
 Examples:
   # Test all implementations with all test configs
   node scripts/k6/benchmark_runner.mjs
-  
+
   # Test only Rust and Python with read tests
   node scripts/k6/benchmark_runner.mjs -i rust-axum,python-fastapi -t read_light,read_heavy
-  
+
   # Quick comparison with light tests
   node scripts/k6/benchmark_runner.mjs -t read_light,write_light --no-warmup
 `);
@@ -176,18 +217,18 @@ async function runCommand(command, args, options = {}) {
     const proc = spawn(command, args, {
       stdio: options.silent ? 'pipe' : 'inherit',
       cwd: options.cwd || process.cwd(),
-      env: { ...process.env, ...options.env }
+      env: { ...process.env, ...options.env },
     });
 
     let stdout = '';
     let stderr = '';
 
     if (options.silent) {
-      proc.stdout?.on('data', (data) => stdout += data.toString());
-      proc.stderr?.on('data', (data) => stderr += data.toString());
+      proc.stdout?.on('data', data => (stdout += data.toString()));
+      proc.stderr?.on('data', data => (stderr += data.toString()));
     }
 
-    proc.on('close', (code) => {
+    proc.on('close', code => {
       if (code === 0) {
         resolve({ code, stdout, stderr });
       } else {
@@ -210,7 +251,7 @@ async function waitForServer(port, maxAttempts = 30) {
       // Try to connect to the posts endpoint (public, no auth needed)
       const response = await fetch(`http://localhost:${port}/auth/login`, {
         method: 'GET',
-        signal: AbortSignal.timeout(2000)
+        signal: AbortSignal.timeout(2000),
       }).catch(() => null);
 
       // Accept any response (200, 401, etc.) - just need server to be responding
@@ -221,7 +262,9 @@ async function waitForServer(port, maxAttempts = 30) {
       // Server not ready yet, continue waiting
     }
 
-    console.log(`  Waiting for server on port ${port}... (${i + 1}/${maxAttempts})`);
+    console.log(
+      `  Waiting for server on port ${port}... (${i + 1}/${maxAttempts})`
+    );
     await sleep(2000);
   }
   return false;
@@ -237,24 +280,30 @@ async function startImplementation(name, config) {
     cwd: implAbsPath,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false,
-    env: { ...process.env, ...dotenvEnv, PORT: config.port.toString() }
+    env: { ...process.env, ...dotenvEnv, PORT: config.port.toString() },
   });
 
   // Log server output for debugging
-  proc.stdout?.on('data', (data) => {
+  proc.stdout?.on('data', data => {
     const output = data.toString().trim();
     if (output) console.log(`  [${name}] ${output}`);
   });
 
-  proc.stderr?.on('data', (data) => {
+  proc.stderr?.on('data', data => {
     const output = data.toString().trim();
-    if (output && !output.includes('WARN')) { // Filter out common warnings
+    if (output && !output.includes('WARN')) {
+      // Filter out common warnings
       console.log(`  [${name}] ${output}`);
     }
   });
 
+  let processExited = false;
+  let exitCode = null;
+
   // Handle process exit
-  proc.on('exit', (code) => {
+  proc.on('exit', code => {
+    processExited = true;
+    exitCode = code;
     if (code !== null && code !== 0) {
       console.log(`  [${name}] Process exited with code ${code}`);
     }
@@ -262,30 +311,40 @@ async function startImplementation(name, config) {
 
   // Wait for server to be ready
   const ready = await waitForServer(config.port);
-  if (!ready) {
+  if (!ready || processExited) {
     proc.kill('SIGTERM');
     throw new Error(`${name} failed to start on port ${config.port}`);
   }
 
   console.log(`✓ ${name} ready on port ${config.port}`);
-  return proc;
+  return { proc, processExited: () => processExited };
 }
 
 async function runWarmup(baseUrl, email, password) {
   console.log('Running warmup...');
 
   try {
-    await runCommand('k6', [
-      'run',
-      '--quiet',
-      '-e', `BASE_URL=${baseUrl}`,
-      '-e', `EMAIL=${email}`,
-      '-e', `PASSWORD=${password}`,
-      '-e', 'TEST_TYPE=read',
-      '-e', 'VUS=10',
-      '-e', 'DURATION=30s',
-      'scripts/k6/throughput_test.js'
-    ], { silent: true, timeout: 45000 });
+    await runCommand(
+      'k6',
+      [
+        'run',
+        '--quiet',
+        '-e',
+        `BASE_URL=${baseUrl}`,
+        '-e',
+        `EMAIL=${email}`,
+        '-e',
+        `PASSWORD=${password}`,
+        '-e',
+        'TEST_TYPE=read',
+        '-e',
+        'VUS=10',
+        '-e',
+        'DURATION=30s',
+        'scripts/k6/throughput_test.js',
+      ],
+      { silent: true, timeout: 45000 }
+    );
 
     console.log('✓ Warmup completed');
   } catch (e) {
@@ -295,7 +354,7 @@ async function runWarmup(baseUrl, email, password) {
 
 async function runBenchmark(impl, config, testConfig, outputDir, credentials) {
   const baseUrl = `http://localhost:${config.port}`;
-  const resultFile = resolve(outputDir, `${impl}_${testConfig.name}.json`);
+  // const resultFile = resolve(outputDir, `${impl}_${testConfig.name}.json`);
 
   console.log(`Running ${testConfig.name} on ${impl}...`);
 
@@ -305,101 +364,50 @@ async function runBenchmark(impl, config, testConfig, outputDir, credentials) {
     PASSWORD: credentials.password,
     TEST_TYPE: testConfig.type,
     VUS: testConfig.vus.toString(),
-    DURATION: testConfig.duration
+    DURATION: testConfig.duration,
   };
 
   try {
     // Run k6 and capture both JSON output and stdout summary
-    const summaryFile = resolve(outputDir, `${impl}_${testConfig.name}_summary.txt`);
+    const summaryFile = resolve(
+      outputDir,
+      `${impl}_${testConfig.name}_summary.txt`
+    );
 
-    const result = await runCommand('k6', [
-      'run',
-      '--out', `json=${resultFile}`,
-      '--summary-export', summaryFile,
-      ...Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]),
-      'scripts/k6/throughput_test.js'
-    ], {
-      timeout: (() => {
-        const durationMatch = testConfig.duration.match(/^(\d+)([sm])$/);
-        if (durationMatch) {
-          const value = parseInt(durationMatch[1]);
-          const unit = durationMatch[2];
-          const durationSeconds = unit === 'm' ? value * 60 : value;
-          return (durationSeconds + 60) * 1000; // Add 60s buffer
-        }
-        return 180000; // 3 minute default timeout
-      })(),
-      silent: false
-    });
-
-    // Parse RPS from k6's stdout output (most reliable)
-    let rps = null;
-    let totalRequests = 0;
-
-    const output = result.stdout || '';
-
-    // Look for the http_reqs line in the summary
-    const httpReqsMatch = output.match(/http_reqs\.+:\s+(\d+)\s+([\d.]+)\/s/);
-    if (httpReqsMatch) {
-      totalRequests = parseInt(httpReqsMatch[1]);
-      rps = parseFloat(httpReqsMatch[2]);
-    }
-
-    // Fallback: calculate from JSON data points if stdout parsing failed
-    if (!rps) {
-      try {
-        const rawResults = readFileSync(resultFile, 'utf8')
-          .split('\n')
-          .filter(line => line.trim())
-          .map(line => JSON.parse(line));
-
-        // Use only http_reqs points
-        const requestPoints = rawResults.filter(entry =>
-          entry.type === 'Point' && entry.metric === 'http_reqs'
-        );
-
-        // Exclude setup and teardown phases if present to measure actual test window
-        const nonSetupTeardown = requestPoints.filter(entry => {
-          const group = entry?.data?.tags?.group;
-          if (group === '::setup') return false;
-          if (typeof group === 'string' && group.startsWith('::teardown')) return false;
-          return true;
-        });
-
-        const pointsForDuration = nonSetupTeardown.length > 0 ? nonSetupTeardown : requestPoints;
-
-        // Sum requests within the measured window
-        totalRequests = pointsForDuration.reduce((sum, entry) => sum + (entry?.data?.value || 0), 0);
-
-        // Compute real elapsed time from first to last measured point
-        // Compute min/max timestamps iteratively to avoid call stack limits
-        let startMs = Infinity;
-        let endMs = -Infinity;
-        for (const p of pointsForDuration) {
-          const t = new Date(p?.data?.time).getTime();
-          if (Number.isFinite(t)) {
-            if (t < startMs) startMs = t;
-            if (t > endMs) endMs = t;
-          }
-        }
-
-        if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
-          const durationSeconds = Math.max(0.000001, (endMs - startMs) / 1000);
-          rps = totalRequests / durationSeconds;
-        } else {
-          // Fallback to configured duration if timestamps are unavailable
+    const result = await runCommand(
+      'k6',
+      [
+        'run',
+        '--summary-export',
+        summaryFile,
+        ...Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]),
+        'scripts/k6/throughput_test.js',
+      ],
+      {
+        timeout: (() => {
           const durationMatch = testConfig.duration.match(/^(\d+)([sm])$/);
           if (durationMatch) {
             const value = parseInt(durationMatch[1]);
             const unit = durationMatch[2];
             const durationSeconds = unit === 'm' ? value * 60 : value;
-            rps = totalRequests / durationSeconds;
+            return (durationSeconds + 60) * 1000; // Add 60s buffer
           }
-        }
-      } catch (e) {
-        console.warn(`Failed to parse JSON results for ${impl}_${testConfig.name}:`, e.message);
+          return 180000; // 3 minute default timeout
+        })(),
+        silent: false,
       }
-    }
+    );
+
+    // Parse RPS from k6's stdout output (most reliable)
+    let rps = null;
+    let totalRequests = 0;
+
+    // Look for the http_reqs line in the summary file with is a JSON file
+    const summary = readFileSync(summaryFile, 'utf8');
+    const summaryJson = JSON.parse(summary);
+    const httpReqs = summaryJson.metrics.http_reqs;
+    totalRequests = httpReqs.count;
+    rps = httpReqs.rate;
 
     return {
       implementation: impl,
@@ -408,9 +416,7 @@ async function runBenchmark(impl, config, testConfig, outputDir, credentials) {
       duration: testConfig.duration,
       totalRequests,
       rps: Math.round(rps * 100) / 100,
-      resultFile
     };
-
   } catch (error) {
     console.error(`✗ ${testConfig.name} on ${impl} failed:`, error.message);
     return {
@@ -418,7 +424,7 @@ async function runBenchmark(impl, config, testConfig, outputDir, credentials) {
       test: testConfig.name,
       vus: testConfig.vus,
       duration: testConfig.duration,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -457,14 +463,20 @@ function generateReport(results, outputDir) {
 
       markdown += `### Performance Ranking\n\n`;
       successful.forEach((result, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '  ';
-        markdown += `${medal} **${result.implementation}**: ${result.rps.toLocaleString()} RPS\n`;
+        const medal =
+          index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '  ';
+        markdown += `${medal} **${
+          result.implementation
+        }**: ${result.rps.toLocaleString()} RPS\n`;
       });
 
       if (successful.length > 1) {
         const best = successful[0];
         const worst = successful[successful.length - 1];
-        const improvement = ((best.rps - worst.rps) / worst.rps * 100).toFixed(1);
+        const improvement = (
+          ((best.rps - worst.rps) / worst.rps) *
+          100
+        ).toFixed(1);
         markdown += `\n*${best.implementation} is ${improvement}% faster than ${worst.implementation}*\n`;
       }
     }
@@ -487,7 +499,11 @@ function generateReport(results, outputDir) {
   const csvLines = ['implementation,test,vus,duration,rps,status'];
   results.forEach(result => {
     const status = result.error ? 'failed' : 'success';
-    csvLines.push(`${result.implementation},${result.test},${result.vus},${result.duration},${result.rps || ''},${status}`);
+    csvLines.push(
+      `${result.implementation},${result.test},${result.vus},${
+        result.duration
+      },${result.rps || ''},${status}`
+    );
   });
 
   const csvPath = resolve(outputDir, 'benchmark_results.csv');
@@ -523,36 +539,55 @@ async function main() {
 
       console.log(`\n📊 Testing ${implName}`);
 
-      // Start implementation
-      const proc = await startImplementation(implName, implConfig);
-      runningProcs.push(proc);
+      try {
+        // Start implementation
+        const implHandle = await startImplementation(implName, implConfig);
+        runningProcs.push(implHandle);
 
-      const baseUrl = `http://localhost:${implConfig.port}`;
+        const baseUrl = `http://localhost:${implConfig.port}`;
 
-      // Warmup
-      if (args.warmup) {
-        await runWarmup(baseUrl, args.email, args.password);
-      }
-
-      // Run tests
-      for (const testConfig of testConfigs) {
-        const result = await runBenchmark(implName, implConfig, testConfig, outputDir, {
-          email: args.email,
-          password: args.password
-        });
-        results.push(result);
-
-        if (result.rps) {
-          console.log(`✓ ${testConfig.name}: ${result.rps.toLocaleString()} RPS`);
+        // Warmup
+        if (args.warmup) {
+          await runWarmup(baseUrl, args.email, args.password);
         }
 
-        // Cool down between tests
-        await sleep(5000);
-      }
+        // Run tests
+        for (const testConfig of testConfigs) {
+          const result = await runBenchmark(
+            implName,
+            implConfig,
+            testConfig,
+            outputDir,
+            {
+              email: args.email,
+              password: args.password,
+            }
+          );
+          results.push(result);
 
-      // Stop implementation
-      proc.kill('SIGTERM');
-      await sleep(2000);
+          if (result.rps) {
+            console.log(
+              `✓ ${testConfig.name}: ${result.rps.toLocaleString()} RPS`
+            );
+          }
+
+          // Cool down between tests
+          await sleep(5000);
+        }
+
+        // Stop implementation (only if still running)
+        if (!implHandle.processExited()) {
+          implHandle.proc.kill('SIGTERM');
+          await sleep(2000);
+        }
+      } catch (error) {
+        console.error(`Failed to test ${implName}:`, error.message);
+        results.push({
+          implementation: implName,
+          test: testConfigs[0]?.name || 'unknown',
+          error: error.message,
+        });
+      }
     }
 
     // Generate report
@@ -564,23 +599,28 @@ async function main() {
 
     // Show quick summary
     const byImpl = {};
-    results.filter(r => !r.error).forEach(r => {
-      if (!byImpl[r.implementation]) byImpl[r.implementation] = [];
-      byImpl[r.implementation].push(r.rps);
-    });
+    results
+      .filter(r => !r.error)
+      .forEach(r => {
+        if (!byImpl[r.implementation]) byImpl[r.implementation] = [];
+        byImpl[r.implementation].push(r.rps);
+      });
 
     console.log('\n🏆 Overall Performance Summary:');
     Object.entries(byImpl)
       .map(([impl, rpsList]) => ({
         impl,
-        avgRps: rpsList.reduce((a, b) => a + b, 0) / rpsList.length
+        avgRps: rpsList.reduce((a, b) => a + b, 0) / rpsList.length,
       }))
       .sort((a, b) => b.avgRps - a.avgRps)
       .forEach((entry, index) => {
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-        console.log(`${medal} ${entry.impl}: ${Math.round(entry.avgRps).toLocaleString()} avg RPS`);
+        console.log(
+          `${medal} ${entry.impl}: ${Math.round(
+            entry.avgRps
+          ).toLocaleString()} avg RPS`
+        );
       });
-
   } catch (error) {
     console.error('❌ Benchmark failed:', error);
     process.exit(1);
@@ -588,7 +628,11 @@ async function main() {
     // Clean up any running processes
     runningProcs.forEach(proc => {
       try {
-        proc.kill('SIGTERM');
+        // Handle both old format (proc) and new format ({proc, processExited})
+        const actualProc = proc.proc || proc;
+        if (actualProc && !proc.processExited?.()) {
+          actualProc.kill('SIGTERM');
+        }
       } catch (e) {
         // Process might already be dead
       }
