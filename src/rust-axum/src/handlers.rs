@@ -4,7 +4,6 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
@@ -42,7 +41,7 @@ pub async fn login(
 
     if let Some(row) = login_row {
         let is_valid = verify_password(&credentials.password, &row.password_hash).await?;
-        
+
         if is_valid {
             let token = create_token(&row.id, row.is_admin, &app_state.auth_config)?;
             return Ok(Json(LoginResponse {

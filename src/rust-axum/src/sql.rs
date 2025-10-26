@@ -1,24 +1,3 @@
-use std::env;
-use std::path::Path;
-
-pub fn load_sql(relative_path: &str) -> Result<String, std::io::Error> {
-    let base_dir = if let Ok(queries_dir) = env::var("QUERIES_DIR") {
-        Path::new(&queries_dir).to_path_buf()
-    } else {
-        // repo_root/database/queries
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("database")
-            .join("queries")
-    };
-    
-    let file_path = base_dir.join(relative_path);
-    std::fs::read_to_string(file_path)
-}
-
 // SQL query constants - loaded at compile time for better performance
 
 // Auth
@@ -44,6 +23,5 @@ pub const SQL_CREATE_COMMENT: &str = include_str!("../../../database/queries/com
 pub const SQL_LIST_COMMENTS: &str = include_str!("../../../database/queries/comments/list.sql");
 
 // Likes
-pub const SQL_LIKE_EXISTS: &str = include_str!("../../../database/queries/likes/exists.sql");
 pub const SQL_CREATE_LIKE: &str = include_str!("../../../database/queries/likes/create.sql");
 pub const SQL_DELETE_LIKE: &str = include_str!("../../../database/queries/likes/delete.sql");

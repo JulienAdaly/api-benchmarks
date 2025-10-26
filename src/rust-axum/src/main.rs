@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configuration
     let database_url = env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://apibench:apibench_password@localhost:15432/apibench".to_string());
-    
+
     let auth_config = AuthConfig::default();
 
     // Create database connection pool with high-load optimized settings
@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run the server
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     tracing::info!("Server running on http://0.0.0.0:8080");
-    
+
     axum::serve(listener, app).await?;
 
     Ok(())
