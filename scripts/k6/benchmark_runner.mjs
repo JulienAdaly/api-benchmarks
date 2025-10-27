@@ -3,21 +3,27 @@
 import { spawn } from 'child_process';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
+import { cleanupConnections } from '../postgres_connection_manager.mjs';
 
 // Configuration
 const IMPLEMENTATIONS = {
+  'python-fastapi-uvicorn': {
+    port: 8000,
+    path: 'src/python-fastapi',
+    startCmd: 'uv run start_server.py',
+  },
   // 'js-effect': {
-  //   port: 3010,
-  //   path: 'src/js-effect',
-  //   startCmd: 'bun run dist/main.js',
-  // },
+    //   port: 3010,
+    //   path: 'src/js-effect',
+    //   startCmd: 'bun run dist/main.js',
+    // },
   'go-fiber': { port: 8081, path: 'src/go-fiber', startCmd: './go-fiber' },
   // 'python-fastapi-granian': { port: 8000, path: 'src/python-fastapi', startCmd: 'DB_POOL_MIN=5 DB_POOL_MAX=5 uv run start_server_granian.py' },
-  // 'python-fastapi-uvicorn': {
-  //   port: 8000,
-  //   path: 'src/python-fastapi',
-  //   startCmd: 'uv run start_server.py',
-  // },
+  'rust-axum': {
+    port: 8080,
+    path: 'src/rust-axum',
+    startCmd: './target/release/rust-axum-api',
+  },
   // 'js-bun-native': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun-native.js' },
   // 'js-bun-express+bunpg': {
   //   port: 3000,
@@ -29,26 +35,26 @@ const IMPLEMENTATIONS = {
     path: 'src/js-express',
     startCmd: 'bun run src/main.js',
   },
-  'rust-axum': {
-    port: 8080,
-    path: 'src/rust-axum',
-    startCmd: './target/release/rust-axum-api',
+  'js-node-express': {
+    port: 3002,
+    path: 'src/js-express',
+    startCmd:
+    'node src/main.js',
   },
-  // 'js-bun-native-server+pg': {
-  //   port: 3010,
-  //   path: 'src/js-express',
-  //   startCmd: 'bun run src/main-bun-native-pg.js',
-  // },
   // 'js-bun-fastify': {
   //   port: 3000,
   //   path: 'src/js-express',
   //   startCmd: 'bun run src/main-fastify.js',
   // },
-  // 'js-node-express': {
-  //   port: 3000,
+  // 'js-node-fastify': {
+  //   port: 3001,
   //   path: 'src/js-express',
-  //   startCmd:
-  //     'NODE_OPTIONS="--max-old-space-size=16384" UV_THREADPOOL_SIZE=16 node src/main.js',
+  //   startCmd: 'node src/main-fastify.js',
+  // },
+  // 'js-bun-native-server+pg': {
+  //   port: 3010,
+  //   path: 'src/js-express',
+  //   startCmd: 'bun run src/main-bun-native-pg.js',
   // },
 };
 
@@ -62,9 +68,9 @@ const TEST_CONFIGS = [
   // { name: 'write_heavy', type: 'write', vus: 500, duration: '1m' },
   // { name: 'write_extreme', type: 'write', vus: 1000, duration: '1m' },
   { name: 'mixed_light', type: 'mixed', vus: 50, duration: '20s' },
-  // { name: 'mixed_medium', type: 'mixed', vus: 200, duration: '1m' },
-  // { name: 'mixed_heavy', type: 'mixed', vus: 500, duration: '1m' },
-  // { name: 'mixed_extreme', type: 'mixed', vus: 1000, duration: '1m' },
+  { name: 'mixed_medium', type: 'mixed', vus: 200, duration: '20s' },
+  { name: 'mixed_heavy', type: 'mixed', vus: 500, duration: '20s' },
+  { name: 'mixed_extreme', type: 'mixed', vus: 1000, duration: '20s' },
 ];
 
 const DEFAULT_CREDENTIALS = {
@@ -537,6 +543,14 @@ async function main() {
         continue;
       }
 
+      // Cleanup PostgreSQL connections before starting new implementation
+      console.log('\n🧹 Cleaning up PostgreSQL connections...');
+      try {
+        await cleanupConnections(20, process.env.DATABASE_URL);
+      } catch (error) {
+        console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
+      }
+
       console.log(`\n📊 Testing ${implName}`);
 
       try {
@@ -579,6 +593,14 @@ async function main() {
         if (!implHandle.processExited()) {
           implHandle.proc.kill('SIGTERM');
           await sleep(2000);
+        }
+
+        // Cleanup PostgreSQL connections after stopping implementation
+        console.log('\n🧹 Cleaning up PostgreSQL connections after stopping...');
+        try {
+          await cleanupConnections(20, process.env.DATABASE_URL);
+        } catch (error) {
+          console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
         }
       } catch (error) {
         console.error(`Failed to test ${implName}:`, error.message);
