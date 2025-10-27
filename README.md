@@ -26,7 +26,7 @@ cd src/rust-axum && cargo build --release
 ### Run all the benchmarks
 
 ```bash
-bun run scripts/k6/benchmark_runner.mjs --parallel
+bun run scripts/k6/benchmark_runner.mjs --parallel --no-warmup
 ``` 
 
 ## See results
