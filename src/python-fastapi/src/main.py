@@ -58,8 +58,8 @@ app: FastAPI = FastAPI(
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    pool_min = int(os.getenv("DB_POOL_MIN", "5"))
-    pool_max = int(os.getenv("DB_POOL_MAX", "20"))
+    pool_min = int(os.getenv("DB_POOL_MIN", "2"))
+    pool_max = int(os.getenv("DB_POOL_MAX", "4"))
     app.state.db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=pool_min, max_size=pool_max)
 
 
