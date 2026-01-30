@@ -19,7 +19,7 @@ const ADMIN_EMAILS = new Set((process.env.ADMIN_EMAILS || "").split(",").map((e)
 // Same deterministic bcrypt salt used by the Python implementation
 const BCRYPT_SALT = "$2b$08$WQZlxDJ5MmT7wSXFTy2UU.";
 
-// Helpers
+// Helpersx
 function loadSql(relativePath) {
   const baseDirEnv = process.env.QUERIES_DIR;
   const baseDir = baseDirEnv ? baseDirEnv : path.resolve(__dirname, "../../../database/queries");
@@ -126,9 +126,30 @@ const SQL_LIKE_EXISTS = loadSql("likes/exists.sql");
 const SQL_CREATE_LIKE = loadSql("likes/create.sql");
 const SQL_DELETE_LIKE = loadSql("likes/delete.sql");
 
-// DB Pool - Configurable connection pool size
-const PG_POOL_MAX = parseInt(process.env.PG_POOL_MAX || "20", 10);
-const pool = new Pool({ connectionString: DATABASE_URL, max: PG_POOL_MAX });
+// DB Pool - Standardized connection pool configuration (can be overridden via environment variables)
+// Note: pg Pool doesn't support min connections, only max (connections are created on-demand)
+const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || "50", 10);
+const DB_POOL_IDLE_TIMEOUT = parseInt(process.env.DB_POOL_IDLE_TIMEOUT || "300", 10) * 1000; // Convert seconds to milliseconds
+const DB_POOL_ACQUIRE_TIMEOUT = parseInt(process.env.DB_POOL_ACQUIRE_TIMEOUT || "10", 10) * 1000; // Convert seconds to milliseconds
+const pool = new Pool({ 
+  connectionString: DATABASE_URL, 
+  max: DB_POOL_MAX,
+  idleTimeoutMillis: DB_POOL_IDLE_TIMEOUT,
+  connectionTimeoutMillis: DB_POOL_ACQUIRE_TIMEOUT,
+  allowExitOnIdle: false, // Keep pool alive
+});
+
+// Handle pool errors to prevent crashes
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err);
+});
+
+// Handle connection errors
+pool.on('connect', (client) => {
+  client.on('error', (err) => {
+    console.error('Unexpected error on client', err);
+  });
+});
 
 const app = express();
 app.use(express.json());
@@ -364,28 +385,25 @@ app.post("/posts/:postId/like", async (req, res) => {
   if (!bearer) return;
   const payload = decodeTokenOr401(bearer, res);
   if (!payload) return;
-  const postId = req.params.postId;
-  const exists = await pool.query(SQL_GET_POST, [postId]);
-  if (!exists.rows[0]) {
-    res.status(404).json({ detail: "Post not found" });
-    return;
-  }
-  const already = await pool.query(SQL_LIKE_EXISTS, [payload.sub, postId]);
-  if (already.rows[0]) {
-    res.status(409).json({ detail: "Post already liked" });
-    return;
-  }
+  const { postId } = req.params;
+
   try {
-    await pool.query(SQL_CREATE_LIKE, [payload.sub, postId]);
-    res.sendStatus(204);
-  } catch (e) {
-    if (e.code === "23505") {
-      // unique_violation
-      res.status(409).json({ detail: "Post already liked" });
-      return;
+    const result = await pool.query(SQL_CREATE_LIKE, [payload.sub, postId]);
+    if (result.rowCount === 1) {
+      res.sendStatus(204);
+    } else {
+      // rowCount is 0, meaning ON CONFLICT DO NOTHING was triggered
+      res.status(409).json({ detail: 'Post already liked' });
     }
-    console.error("Error in handleCreateLike:", e);
-    res.status(500).json({ detail: "Internal Server Error" });
+  } catch (e) {
+    if (e.code === '23503') { // foreign_key_violation
+      res.status(404).json({ detail: 'Post not found' });
+    } else if (e.code === '23505') { // unique_violation, for safety
+      res.status(409).json({ detail: 'Post already liked' });
+    } else {
+      console.error("Error in handleCreateLike:", e);
+      res.status(500).json({ detail: "Internal Server Error" });
+    }
   }
 });
 

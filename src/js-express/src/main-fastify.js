@@ -409,56 +409,49 @@ fastify.get('/posts/:postId/comments', async (request, reply) => {
 fastify.post('/posts/:postId/like', async (request, reply) => {
   const bearer = getToken(request);
   if (!bearer) {
-    reply.status(401).send({ detail: 'Unauthorized' });
-    return;
+    return reply.code(401).send({ detail: 'Unauthorized' });
   }
   const payload = decodeTokenOr401(bearer, reply);
   if (!payload) return;
-  const postId = request.params.postId;
-  const exists = await pool.query(SQL_GET_POST, [postId]);
-  if (!exists.rows[0]) {
-    reply.status(404).send({ detail: 'Post not found' });
-    return;
-  }
-  const already = await pool.query(SQL_LIKE_EXISTS, [payload.sub, postId]);
-  if (already.rows[0]) {
-    reply.status(409).send({ detail: 'Post already liked' });
-    return;
-  }
+  const { postId } = request.params;
+
   try {
-    await pool.query(SQL_CREATE_LIKE, [payload.sub, postId]);
-    reply.status(204).send();
-  } catch (e) {
-    if (e.code === '23505') {
-      // unique_violation
-      reply.status(409).send({ detail: 'Post already liked' });
-      return;
+    const result = await pool.query(SQL_CREATE_LIKE, [payload.sub, postId]);
+    if (result.rowCount === 1) {
+      reply.code(204).send();
+    } else {
+      // rowCount is 0, meaning ON CONFLICT DO NOTHING was triggered
+      reply.code(409).send({ detail: 'Post already liked' });
     }
-    console.error('Error in handleCreateLike:', e);
-    reply.status(500).send({ detail: 'Internal Server Error' });
+  } catch (e) {
+    if (e.code === '23503') { // foreign_key_violation
+      reply.code(404).send({ detail: 'Post not found' });
+    } else if (e.code === '23505') { // unique_violation, for safety
+        reply.code(409).send({ detail: 'Post already liked' });
+    } else {
+      console.error('Error in handleCreateLike:', e);
+      reply.code(500).send({ detail: 'Internal Server Error' });
+    }
   }
 });
 
 fastify.delete('/posts/:postId/like', async (request, reply) => {
   const bearer = getToken(request);
   if (!bearer) {
-    reply.status(401).send({ detail: 'Unauthorized' });
-    return;
+    return reply.code(401).send({ detail: 'Unauthorized' });
   }
   const payload = decodeTokenOr401(bearer, reply);
   if (!payload) return;
   const postId = request.params.postId;
   const exists = await pool.query(SQL_GET_POST, [postId]);
   if (!exists.rows[0]) {
-    reply.status(404).send({ detail: 'Post not found' });
-    return;
+    return reply.code(404).send({ detail: 'Post not found' });
   }
   const result = await pool.query(SQL_DELETE_LIKE, [payload.sub, postId]);
   if (result.rowCount !== 1) {
-    reply.status(404).send({ detail: 'Post or like not found' });
-    return;
+    return reply.code(404).send({ detail: 'Post or like not found' });
   }
-  reply.status(204).send();
+  reply.code(204).send();
 });
 
 // Startup & Shutdown
