@@ -373,25 +373,22 @@ async function handleCreateLike(headers, postId) {
   if (!payload) return errorResponse('Unauthorized', 401);
 
   try {
-    const exists = await sql.unsafe(SQL_GET_POST, [postId]);
-    if (!exists[0]) return errorResponse('Post not found', 404);
-
-    const already = await sql.unsafe(SQL_LIKE_EXISTS, [payload.sub, postId]);
-    if (already[0]) return errorResponse('Post already liked', 409);
-
-    await sql.unsafe(SQL_CREATE_LIKE, [payload.sub, postId]);
-    return new Response(null, { status: 204 });
-  } catch (error) {
-    // Handle PostgreSQL unique violation error
-    if (error.code === '23505') {
+    const result = await sql.unsafe(SQL_CREATE_LIKE, [payload.sub, postId]);
+    if (result.rowCount === 1) {
+      return new Response(null, { status: 204 });
+    } else {
+      // rowCount is 0, meaning ON CONFLICT DO NOTHING was triggered
       return errorResponse('Post already liked', 409);
     }
-    // Handle PostgreSQL foreign key violation error
-    if (error.code === '23503') {
+  } catch (error) {
+    if (error.code === '23503') { // foreign_key_violation
       return errorResponse('Post not found', 404);
+    } else if (error.code === '23505') { // unique_violation, for safety
+      return errorResponse('Post already liked', 409);
+    } else {
+      console.error('Error in handleCreateLike:', error);
+      return errorResponse('Internal Server Error', 500);
     }
-    console.error('Error in handleCreateLike:', error);
-    return errorResponse('Internal Server Error', 500);
   }
 }
 
