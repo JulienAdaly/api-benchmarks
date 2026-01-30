@@ -370,28 +370,25 @@ app.post("/posts/:postId/like", async (req, res) => {
   if (!bearer) return;
   const payload = decodeTokenOr401(bearer, res);
   if (!payload) return;
-  const postId = req.params.postId;
-  const exists = await sql.unsafe(SQL_GET_POST, [postId]);
-  if (!exists[0]) {
-    res.status(404).json({ detail: "Post not found" });
-    return;
-  }
-  const already = await sql.unsafe(SQL_LIKE_EXISTS, [payload.sub, postId]);
-  if (already[0]) {
-    res.status(409).json({ detail: "Post already liked" });
-    return;
-  }
+  const { postId } = req.params;
+
   try {
-    await sql.unsafe(SQL_CREATE_LIKE, [payload.sub, postId]);
-    res.sendStatus(204);
-  } catch (e) {
-    if (e.code === "23505") {
-      // unique_violation
-      res.status(409).json({ detail: "Post already liked" });
-      return;
+    const result = await sql.unsafe(SQL_CREATE_LIKE, [payload.sub, postId]);
+    if (result.count === 1) {
+      res.sendStatus(204);
+    } else {
+      // count is 0, meaning ON CONFLICT DO NOTHING was triggered
+      res.status(409).json({ detail: 'Post already liked' });
     }
-    console.error("Error in handleCreateLike:", e);
-    res.status(500).json({ detail: "Internal Server Error" });
+  } catch (e) {
+    if (e.code === '23503') { // foreign_key_violation
+      res.status(404).json({ detail: 'Post not found' });
+    } else if (e.code === '23505') { // unique_violation, for safety
+      res.status(409).json({ detail: 'Post already liked' });
+    } else {
+      console.error("Error in handleCreateLike:", e);
+      res.status(500).json({ detail: "Internal Server Error" });
+    }
   }
 });
 
