@@ -1,18 +1,48 @@
 services:
-  devcontainer:
+# Shared base image - built once and reused by all backend services
+  backend_base:
     build:
       context: .
       dockerfile: Dockerfile
       network: host
+    image: api-benchmarks-backend-base:latest
+    # This service doesn't need to run, it's just for building the base image
+    command: /bin/true
+
+  devcontainer:
+    image: api-benchmarks-backend-base:latest
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      go-fiber:
+        condition: service_healthy
+      js-effect:
+        condition: service_healthy
+      node-js-effect:
+        condition: service_healthy
+      bun-js-express:
+        condition: service_healthy
+      node-js-express:
+        condition: service_healthy
+      bun-js-fastify:
+        condition: service_healthy
+      node-js-fastify:
+        condition: service_healthy
+      js-deps-express:
+        condition: service_completed_successfully
+      js-deps-effect:
+        condition: service_completed_successfully
+      python-fastapi:
+        condition: service_healthy
+      rust-axum:
+        condition: service_healthy
     volumes:
       - ../..:/workspaces:cached
       - apibench-node_modules:/workspace/node_modules
       - apibench-venv:/workspace/services/message-router/.venv
     command: sleep infinity
-
-    depends_on:
-      - db
-
     network_mode: host
 
   ##########################################################################################################
@@ -36,11 +66,294 @@ services:
       - ../database/migrations:/docker-entrypoint-initdb.d
       - apibench-db-data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -P $$POSTGRES_PASSWORD']
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  ##########################################################################################################
+  # Backend Services
+  ##########################################################################################################
+
+  # Common backend configuration (includes resource limits)
+  backend_common: &backend_common
+    image: api-benchmarks-backend-base:latest
+    volumes:
+      - ../..:/workspaces:cached
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-apibench}:${POSTGRES_PASSWORD:-apibench_password}@db:5432/${POSTGRES_DB:-apibench}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Standardized DB pool configuration for all backends
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_POOL_MIN: ${DB_POOL_MIN:-5}
+      DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-300}
+      DB_POOL_MAX_LIFETIME: ${DB_POOL_MAX_LIFETIME:-1800}
+      DB_POOL_ACQUIRE_TIMEOUT: ${DB_POOL_ACQUIRE_TIMEOUT:-10}
+    cpus: '4.0'
+    mem_limit: 8g
+
+  # Service to install JS dependencies once to avoid race conditions
+  js-deps-express:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-express
+    command: sh -c "export PATH=/root/.bun/bin:$$PATH && bun install"
+    healthcheck:
+      test: ["CMD-SHELL", "[ -d node_modules ] || exit 1"]
+      interval: 5s
+      timeout: 60s
+      retries: 1
+
+  js-deps-effect:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-effect
+    command: sh -c "export PATH=/root/.bun/bin:$$PATH && bun install"
+    healthcheck:
+      test: ["CMD-SHELL", "[ -d node_modules ] || exit 1"]
+      interval: 5s
+      timeout: 60s
+      retries: 1
+
+  go-fiber:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/go-fiber
+    command: >
+      sh -c "
+        go build -o go-fiber &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=8080 &&
+        ./go-fiber
+      "
+    ports:
+      - '8080:8080'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  js-effect:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-effect
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      js-deps-effect:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        export PATH=/root/.bun/bin:$$PATH &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=3000 &&
+        bun run src/main.ts
+      "
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  node-js-effect:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-effect
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      js-deps-effect:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        export PATH=/root/.bun/bin:$$PATH &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=3002 &&
+        node --import tsx src/main-node.ts
+      "
+    ports:
+      - '3002:3002'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3002/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  bun-js-express:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-express
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      js-deps-express:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        export PATH=/root/.bun/bin:$$PATH &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=3001 &&
+        bun run src/main.js
+      "
+    ports:
+      - '3001:3001'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  node-js-express:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-express
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      js-deps-express:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        export PATH=/root/.bun/bin:$$PATH &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=3003 &&
+        node src/main.js
+      "
+    ports:
+      - '3003:3003'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3003/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  bun-js-fastify:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-express
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      js-deps-express:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        export PATH=/root/.bun/bin:$$PATH &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=3004 &&
+        bun run src/main-fastify.js
+      "
+    ports:
+      - '3004:3004'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3004/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  node-js-fastify:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/js-express
+    depends_on:
+      backend_base:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      js-deps-express:
+        condition: service_completed_successfully
+    command: >
+      sh -c "
+        export PATH=/root/.bun/bin:$$PATH &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=3005 &&
+        node src/main-fastify.js
+      "
+    ports:
+      - '3005:3005'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3005/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  python-fastapi:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/python-fastapi
+    command: >
+      sh -c "
+        export PATH=/root/.cargo/bin:/root/.local/bin:$$PATH &&
+        uv sync &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        uv run start_server.py
+      "
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/posts > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  rust-axum:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/rust-axum
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-apibench}:${POSTGRES_PASSWORD:-apibench_password}@db:5432/${POSTGRES_DB:-apibench}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Standardized DB pool configuration for all backends
+      DB_POOL_MAX: ${DB_POOL_MAX:-50}
+      DB_POOL_MIN: 0  # Use lazy connections to avoid connection timeouts on startup
+      DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-300}
+      DB_POOL_MAX_LIFETIME: ${DB_POOL_MAX_LIFETIME:-1800}
+      DB_POOL_ACQUIRE_TIMEOUT: ${DB_POOL_ACQUIRE_TIMEOUT:-10}
+    command: >
+      sh -c "
+        export PATH=/root/.cargo/bin:$$PATH &&
+        cargo build --release &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        ./target/release/rust-axum-api
+      "
+    ports:
+      - '8082:8080'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/posts || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
 
 volumes:
   apibench-data:
