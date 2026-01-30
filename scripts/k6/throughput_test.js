@@ -12,6 +12,12 @@ function generateRandomString(length = 8) {
 }
 
 // Configuration
+// Available backends in docker-compose:
+// - go-fiber: http://localhost:8080
+// - js-effect: http://localhost:3000
+// - js-express: http://localhost:3001
+// - python-fastapi: http://localhost:8000
+// - rust-axum: http://localhost:8081
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const EMAIL = __ENV.EMAIL || 'john.doe@example.com';
 const PASSWORD = __ENV.PASSWORD || 's3cureP@ssw0rd';
@@ -215,7 +221,7 @@ function performWriteTest(headers) {
 Usage Examples:
 
 # Pure read throughput test
-k6 run -e BASE_URL=http://localhost:8000/v1 \
+k6 run -e BASE_URL=http://localhost:8000 \
        -e EMAIL=john.doe@example.com -e PASSWORD=s3cureP@ssw0rd \
        -e TEST_TYPE=read -e VUS=100 -e DURATION=5m \
        scripts/k6/throughput_test.js
@@ -229,7 +235,8 @@ k6 run -e TEST_TYPE=mixed -e VUS=75 -e DURATION=3m \
        scripts/k6/throughput_test.js
 
 Environment Variables:
-- BASE_URL: API endpoint (default: http://localhost:8080/v1)
+- BASE_URL: API endpoint (default: http://localhost:8080)
+  Available backends: go-fiber:8080, js-effect:3000, js-express:3001, python-fastapi:8000, rust-axum:8081
 - EMAIL/PASSWORD: User credentials
 - TEST_TYPE: 'read', 'write', or 'mixed' (default: 'read')
 - VUS: Number of virtual users (default: 50)

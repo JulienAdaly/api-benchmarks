@@ -6,56 +6,55 @@ import { resolve } from 'path';
 import { cleanupConnections } from '../postgres_connection_manager.mjs';
 
 // Configuration
+// Note: These ports match the docker-compose.yml backend services
+// If backends are running in docker-compose, you can skip starting them
+// by using the --skip-start flag (if implemented) or just run k6 directly
 const IMPLEMENTATIONS = {
-  'python-fastapi-uvicorn': {
-    port: 8000,
-    path: 'src/python-fastapi',
-    startCmd: 'uv run start_server.py',
-  },
-  // 'js-effect': {
-    //   port: 3010,
-    //   path: 'src/js-effect',
-    //   startCmd: 'bun run dist/main.js',
-    // },
-  'go-fiber': { port: 8081, path: 'src/go-fiber', startCmd: './go-fiber' },
-  // 'python-fastapi-granian': { port: 8000, path: 'src/python-fastapi', startCmd: 'DB_POOL_MIN=5 DB_POOL_MAX=5 uv run start_server_granian.py' },
-  'rust-axum': {
-    port: 8080,
-    path: 'src/rust-axum',
-    startCmd: './target/release/rust-axum-api',
-  },
-  // 'js-bun-native': { port: 3000, path: 'src/js-express', startCmd: 'PG_MAX=90 PG_IDLE_TIMEOUT=9 PG_CONNECT_TIMEOUT=9 bun run src/main-bun-native.js' },
-  // 'js-bun-express+bunpg': {
-  //   port: 3000,
-  //   path: 'src/js-express',
-  //   startCmd: 'bun run src/main-bunpg.js',
-  // },
-  'js-bun-express': {
-    port: 3005,
-    path: 'src/js-express',
-    startCmd: 'bun run src/main.js',
-  },
-  'js-node-express': {
-    port: 3002,
-    path: 'src/js-express',
-    startCmd:
-    'node src/main.js',
-  },
-  // 'js-bun-fastify': {
-  //   port: 3000,
+  // 'bun-js-fastify': {
+  //   port: 3004,
   //   path: 'src/js-express',
   //   startCmd: 'bun run src/main-fastify.js',
   // },
-  // 'js-node-fastify': {
-  //   port: 3001,
+  // 'node-js-fastify': {
+  //   port: 3005,
   //   path: 'src/js-express',
   //   startCmd: 'node src/main-fastify.js',
   // },
-  // 'js-bun-native-server+pg': {
-  //   port: 3010,
-  //   path: 'src/js-express',
-  //   startCmd: 'bun run src/main-bun-native-pg.js',
+  // 'node-js-effect': {
+  //   port: 3002,
+  //   path: 'src/js-effect',
+  //   startCmd: 'node --import tsx src/main-node.ts',
   // },
+  // 'bun-js-effect': {
+  //   port: 3000,
+  //   path: 'src/js-effect',
+  //   startCmd: 'bun run src/main.ts',
+  // },
+  'python-fastapi': {
+    port: 8000,
+    path: 'src/python-fastapi',
+    startCmd: 'uv run start_server.py'
+  },
+  'go-fiber': {
+    port: 8080,
+    path: 'src/go-fiber',
+    startCmd: './go-fiber',
+  },
+  'rust-axum': {
+    port: 8082,
+    path: 'src/rust-axum',
+    startCmd: 'export PORT=8082 && ./target/release/rust-axum-api',
+  },
+  'node-js-express': {
+    port: 3003,
+    path: 'src/js-express',
+    startCmd: 'node src/main.js',
+  },
+  'bun-js-express': {
+    port: 3001,
+    path: 'src/js-express',
+    startCmd: 'bun run src/main.js',
+  },
 };
 
 const TEST_CONFIGS = [
@@ -111,12 +110,12 @@ function loadEnvForImplementation(implAbsPath) {
   if (existsSync(rootEnvPath)) {
     try {
       merged = { ...merged, ...parseDotenv(readFileSync(rootEnvPath, 'utf8')) };
-    } catch {}
+    } catch { }
   }
   if (existsSync(implEnvPath)) {
     try {
       merged = { ...merged, ...parseDotenv(readFileSync(implEnvPath, 'utf8')) };
-    } catch {}
+    } catch { }
   }
   return merged;
 }
@@ -187,14 +186,14 @@ Usage: node scripts/k6/benchmark_runner.mjs [options]
 Options:
   -i, --implementations <list>  Comma-separated list of implementations to test
                                Available: ${Object.keys(IMPLEMENTATIONS).join(
-                                 ', '
-                               )}
+    ', '
+  )}
                                Default: all implementations
 
   -t, --tests <list>           Comma-separated list of test configurations
                                Available: ${TEST_CONFIGS.map(t => t.name).join(
-                                 ', '
-                               )}
+    ', '
+  )}
                                Default: all tests
 
   -o, --output <dir>           Output directory for results (default: benchmark_results)
@@ -251,16 +250,30 @@ async function runCommand(command, args, options = {}) {
   });
 }
 
+async function isServiceRunning(port) {
+  try {
+    const response = await fetch(`http://localhost:${port}/posts`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(1000),
+    }).catch(() => null);
+
+    // Accept any response (200, etc.) - just need server to be responding
+    return response && response.status < 500;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function waitForServer(port, maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       // Try to connect to the posts endpoint (public, no auth needed)
-      const response = await fetch(`http://localhost:${port}/auth/login`, {
+      const response = await fetch(`http://localhost:${port}/posts`, {
         method: 'GET',
         signal: AbortSignal.timeout(2000),
       }).catch(() => null);
 
-      // Accept any response (200, 401, etc.) - just need server to be responding
+      // Accept any response (200, etc.) - just need server to be responding
       if (response && response.status < 500) {
         return true;
       }
@@ -277,6 +290,18 @@ async function waitForServer(port, maxAttempts = 30) {
 }
 
 async function startImplementation(name, config) {
+  // Check if service is already running (e.g., in Docker)
+  const alreadyRunning = await isServiceRunning(config.port);
+  if (alreadyRunning) {
+    console.log(`✓ ${name} is already running on port ${config.port} (skipping start)`);
+    // Return a dummy handle that indicates the service is already running
+    return {
+      proc: null,
+      processExited: () => false,
+      alreadyRunning: true
+    };
+  }
+
   console.log(`Starting ${name}...`);
 
   const implAbsPath = resolve(process.cwd(), config.path);
@@ -323,7 +348,7 @@ async function startImplementation(name, config) {
   }
 
   console.log(`✓ ${name} ready on port ${config.port}`);
-  return { proc, processExited: () => processExited };
+  return { proc, processExited: () => processExited, alreadyRunning: false };
 }
 
 async function runWarmup(baseUrl, email, password) {
@@ -471,9 +496,8 @@ function generateReport(results, outputDir) {
       successful.forEach((result, index) => {
         const medal =
           index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '  ';
-        markdown += `${medal} **${
-          result.implementation
-        }**: ${result.rps.toLocaleString()} RPS\n`;
+        markdown += `${medal} **${result.implementation
+          }**: ${result.rps.toLocaleString()} RPS\n`;
       });
 
       if (successful.length > 1) {
@@ -506,8 +530,7 @@ function generateReport(results, outputDir) {
   results.forEach(result => {
     const status = result.error ? 'failed' : 'success';
     csvLines.push(
-      `${result.implementation},${result.test},${result.vus},${
-        result.duration
+      `${result.implementation},${result.test},${result.vus},${result.duration
       },${result.rps || ''},${status}`
     );
   });
@@ -546,9 +569,21 @@ async function main() {
       // Cleanup PostgreSQL connections before starting new implementation
       console.log('\n🧹 Cleaning up PostgreSQL connections...');
       try {
-        await cleanupConnections(20, process.env.DATABASE_URL);
+        // Use longer timeout to handle cases where there are many connections
+        await cleanupConnections(30, process.env.DATABASE_URL);
       } catch (error) {
-        console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
+        // If cleanup fails due to too many connections, wait a bit and try once more
+        if (error.message && error.message.includes('too many clients')) {
+          console.warn('⚠ Too many connections, waiting before retry...');
+          await sleep(5000);
+          try {
+            await cleanupConnections(30, process.env.DATABASE_URL);
+          } catch (retryError) {
+            console.warn('⚠ PostgreSQL cleanup failed after retry, continuing anyway:', retryError.message);
+          }
+        } else {
+          console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
+        }
       }
 
       console.log(`\n📊 Testing ${implName}`);
@@ -589,16 +624,27 @@ async function main() {
           await sleep(5000);
         }
 
-        // Stop implementation (only if still running)
-        if (!implHandle.processExited()) {
+        // Stop implementation (only if we started it and it's still running)
+        if (!implHandle.alreadyRunning && !implHandle.processExited() && implHandle.proc) {
+          console.log(`Stopping ${implName}...`);
           implHandle.proc.kill('SIGTERM');
-          await sleep(2000);
+          // Wait longer for server to shut down and close connections gracefully
+          await sleep(5000);
+          
+          // Force kill if still running after graceful shutdown
+          if (!implHandle.processExited()) {
+            console.log(`Force killing ${implName}...`);
+            implHandle.proc.kill('SIGKILL');
+            await sleep(2000);
+          }
         }
 
         // Cleanup PostgreSQL connections after stopping implementation
+        // Wait a bit longer for connections to close naturally before forcing cleanup
         console.log('\n🧹 Cleaning up PostgreSQL connections after stopping...');
+        await sleep(3000); // Give connections time to close naturally
         try {
-          await cleanupConnections(20, process.env.DATABASE_URL);
+          await cleanupConnections(30, process.env.DATABASE_URL);
         } catch (error) {
           console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
         }
@@ -647,12 +693,12 @@ async function main() {
     console.error('❌ Benchmark failed:', error);
     process.exit(1);
   } finally {
-    // Clean up any running processes
+    // Clean up any running processes (only ones we started)
     runningProcs.forEach(proc => {
       try {
-        // Handle both old format (proc) and new format ({proc, processExited})
+        // Handle both old format (proc) and new format ({proc, processExited, alreadyRunning})
         const actualProc = proc.proc || proc;
-        if (actualProc && !proc.processExited?.()) {
+        if (actualProc && !proc.alreadyRunning && !proc.processExited?.()) {
           actualProc.kill('SIGTERM');
         }
       } catch (e) {

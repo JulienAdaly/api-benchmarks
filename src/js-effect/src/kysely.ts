@@ -16,17 +16,23 @@ import {
 class DatabaseLive extends Effect.Service<DatabaseLive>()('DatabaseLive', {
   scoped: Effect.gen(function* () {
     const connectionString = yield* Config.string('DATABASE_URL');
+    // Standardized DB pool configuration (can be overridden via environment variables)
+    // Note: pg Pool doesn't support min connections, only max
     const maxConnections = yield* Config.number('DB_POOL_MAX').pipe(
-      Config.withDefault(20)
+      Config.withDefault(50)
     );
-    const minConnections = yield* Config.number('DB_POOL_MIN').pipe(
+    const idleTimeoutMillis = (yield* Config.number('DB_POOL_IDLE_TIMEOUT').pipe(
+      Config.withDefault(300)
+    )) * 1000; // Convert seconds to milliseconds
+    const connectionTimeoutMillis = (yield* Config.number('DB_POOL_ACQUIRE_TIMEOUT').pipe(
       Config.withDefault(10)
-    );
+    )) * 1000; // Convert seconds to milliseconds
     const dialect = new PostgresDialect({
       pool: new Pool({
         connectionString,
         max: maxConnections,
-        min: minConnections,
+        idleTimeoutMillis,
+        connectionTimeoutMillis,
       }),
     });
     return yield* Effect.acquireRelease(

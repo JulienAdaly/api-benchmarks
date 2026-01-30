@@ -10,6 +10,7 @@ import {
   UnauthorizedError,
 } from './errors.js';
 import { UserId } from './domain.js';
+import { verifyPassword, hashPassword } from './password.js';
 
 const AuthApiLive = HttpApiBuilder.group(Api, 'auth', handlers =>
   handlers
@@ -25,12 +26,9 @@ const AuthApiLive = HttpApiBuilder.group(Api, 'auth', handlers =>
               )
             )
           );
-        const check = yield* Effect.promise(() =>
-          Bun.password.verify(
-            payload.password,
-            credentials.password_hash,
-            'bcrypt'
-          )
+        const check = yield* verifyPassword(
+          payload.password,
+          credentials.password_hash
         );
         if (!check) {
           return yield* new UnauthorizedError({ detail: 'Unauthorized' });
@@ -69,11 +67,7 @@ const UserApiLive = HttpApiBuilder.group(Api, 'users', handlers =>
         if (session.role !== 'admin') {
           return yield* new ForbiddenError({ detail: 'Forbidden' });
         }
-        const hash = yield* Effect.promise(() =>
-          Bun.password.hash(payload.password, {
-            algorithm: 'bcrypt',
-          })
-        );
+        const hash = yield* hashPassword(payload.password);
         const userId = yield* sql
           .createUser({
             username: payload.username,

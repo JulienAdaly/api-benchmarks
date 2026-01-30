@@ -55,24 +55,46 @@ async function forceCloseConnections(databaseUrl = DEFAULT_DATABASE_URL) {
     // Use pg client from the js-express implementation
     const pg = await import('../src/js-express/node_modules/pg/esm/index.mjs');
     const { Client } = pg;
+    // Use a very small connection timeout and single connection to avoid adding to the problem
     const client = new Client({
       connectionString: databaseUrl,
-      connectionTimeoutMillis: 5000
+      connectionTimeoutMillis: 2000,
+      // Don't use connection pooling - we need a direct connection
     });
     
     await client.connect();
-    const result = await client.query(`
+    
+    // First, try to terminate idle connections (less disruptive)
+    const idleResult = await client.query(`
       SELECT pg_terminate_backend(pid) 
       FROM pg_stat_activity 
       WHERE datname = current_database() 
       AND pid <> pg_backend_pid() 
       AND state IN ('idle', 'idle in transaction')
     `);
+    
+    // If we still have too many connections, terminate active ones too
+    // (this is more aggressive but necessary when hitting connection limits)
+    const activeResult = await client.query(`
+      SELECT pg_terminate_backend(pid) 
+      FROM pg_stat_activity 
+      WHERE datname = current_database() 
+      AND pid <> pg_backend_pid() 
+      AND state = 'active'
+      AND application_name NOT LIKE '%postgres%'
+    `);
+    
     await client.end();
     
-    console.log(`Force closed ${result.rowCount} idle connections`);
+    const totalClosed = (idleResult.rowCount || 0) + (activeResult.rowCount || 0);
+    console.log(`Force closed ${totalClosed} connections (${idleResult.rowCount || 0} idle, ${activeResult.rowCount || 0} active)`);
     return true;
   } catch (error) {
+    // If we can't connect due to too many clients, that's expected
+    if (error.message && error.message.includes('too many clients')) {
+      console.warn('Could not connect to force close connections: too many clients already');
+      return false;
+    }
     console.warn('Could not force close connections:', error.message);
     return false;
   }
