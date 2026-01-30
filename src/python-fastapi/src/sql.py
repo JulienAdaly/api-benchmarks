@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+
 def load_sql(relative_path: str) -> str:
     base_dir_env = os.getenv("QUERIES_DIR")
     if base_dir_env:

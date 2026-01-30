@@ -1,20 +1,41 @@
-import time
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
+from fastapi.responses import ORJSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.concurrency import run_in_threadpool
 import os
 import asyncpg
 from asyncpg import exceptions as pg_exc
 import jwt
 import bcrypt
-from pathlib import Path
 
-from pydantic import BaseModel
 from typing import Optional, List
 
-from loguru import logger
-from src.models import LoginCredentialsModel, CreateUserModel, UpdateUserModel, PostCreateModel, CommentCreateModel
+from src.models import (
+    LoginCredentialsModel,
+    CreateUserModel,
+    UpdateUserModel,
+    PostCreateModel,
+    CommentCreateModel,
+)
 from src.utils import require_admin, shape_user_row, shape_post_row, shape_comment_row
-from src.sql import SQL_LOGIN, SQL_ME, SQL_CREATE_USER, SQL_GET_USER, SQL_LIST_USERS, SQL_UPDATE_USER, SQL_DELETE_USER, SQL_CREATE_POST, SQL_LIST_POSTS, SQL_GET_POST, SQL_GET_POST_AUTHOR, SQL_DELETE_POST, SQL_CREATE_COMMENT, SQL_LIST_COMMENTS, SQL_LIKE_EXISTS, SQL_CREATE_LIKE, SQL_DELETE_LIKE
+from src.sql import (
+    SQL_LOGIN,
+    SQL_ME,
+    SQL_CREATE_USER,
+    SQL_GET_USER,
+    SQL_LIST_USERS,
+    SQL_UPDATE_USER,
+    SQL_DELETE_USER,
+    SQL_CREATE_POST,
+    SQL_LIST_POSTS,
+    SQL_GET_POST,
+    SQL_GET_POST_AUTHOR,
+    SQL_DELETE_POST,
+    SQL_CREATE_COMMENT,
+    SQL_LIST_COMMENTS,
+    SQL_CREATE_LIKE,
+    SQL_DELETE_LIKE,
+)
 
 
 ################################################################################
@@ -53,14 +74,22 @@ def get_token(request: Request) -> str:
 
 
 app: FastAPI = FastAPI(
-    log_level="info",
+    log_level=None,
+    default_response_class=ORJSONResponse,
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    pool_min = int(os.getenv("DB_POOL_MIN", "2"))
-    pool_max = int(os.getenv("DB_POOL_MAX", "4"))
-    app.state.db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=pool_min, max_size=pool_max)
+    pool_min = int(os.getenv("DB_POOL_MIN", "10"))
+    pool_max = int(os.getenv("DB_POOL_MAX", "20"))
+    app.state.db_pool = await asyncpg.create_pool(
+        DATABASE_URL,
+        min_size=pool_min,
+        max_size=pool_max,
+    )
 
 
 @app.on_event("shutdown")
@@ -72,9 +101,6 @@ async def get_db_connection():
     async with app.state.db_pool.acquire() as conn:
         yield conn
 
-
-logger.log_level = "WARNING"
-
 ################################################################################
 # Auth endpoints
 ################################################################################
@@ -84,7 +110,6 @@ logger.log_level = "WARNING"
 async def login(
     body: LoginCredentialsModel, conn: asyncpg.Connection = Depends(get_db_connection)
 ) -> dict:
-    
     result = await conn.fetchrow(
         SQL_LOGIN,
         body.email,
@@ -99,7 +124,11 @@ async def login(
             result["password_hash"].encode(),
         )
     if result and is_valid:
-        token = jwt.encode({"sub": str(result["id"]), "is_admin": result["is_admin"]}, JWT_SECRET, algorithm="HS256")
+        token = jwt.encode(
+            {"sub": str(result["id"]), "is_admin": result["is_admin"]},
+            JWT_SECRET,
+            algorithm="HS256",
+        )
 
         return {"accessToken": token}
 
@@ -148,7 +177,6 @@ async def create_user(
     token: str = Depends(get_token),
     conn: asyncpg.Connection = Depends(get_db_connection),
 ) -> Optional[dict]:
-
     await require_admin(decode_token(token))
 
     if not BCRYPT_SALT:
@@ -194,6 +222,7 @@ async def list_users(
     rows = await conn.fetch(SQL_LIST_USERS, limit, offset)
     return [shape_user_row(r) for r in rows]
 
+
 @app.put("/users/{user_id}", response_model=dict, summary="Update user (Admin only)")
 async def update_user(
     user_id: str,
@@ -201,7 +230,6 @@ async def update_user(
     token: str = Depends(get_token),
     conn: asyncpg.Connection = Depends(get_db_connection),
 ) -> dict:
-
     await require_admin(decode_token(token))
 
     row = await conn.fetchrow(SQL_UPDATE_USER, user_id, update.bio)
@@ -222,7 +250,6 @@ async def delete_user(
     token: str = Depends(get_token),
     conn: asyncpg.Connection = Depends(get_db_connection),
 ) -> Response:
-
     await require_admin(decode_token(token))
 
     result = await conn.execute(SQL_DELETE_USER, user_id)
@@ -295,7 +322,7 @@ async def delete_post(
         )
     if str(author_id) != str(user_id):
         await require_admin(decoded_token)
-        
+
     await conn.execute(SQL_DELETE_POST, post_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -306,7 +333,9 @@ async def delete_post(
 
 
 @app.post(
-    "/posts/{post_id}/comments", response_model=dict, status_code=status.HTTP_201_CREATED
+    "/posts/{post_id}/comments",
+    response_model=dict,
+    status_code=status.HTTP_201_CREATED,
 )
 async def create_comment(
     post_id: str,

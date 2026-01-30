@@ -1,10 +1,5 @@
 from fastapi import HTTPException, status
 import asyncpg
-import os
-from pathlib import Path
-import bcrypt
-import jwt
-
 
 
 async def require_admin(decoded_token: dict) -> None:
@@ -41,4 +36,3 @@ def shape_comment_row(row: asyncpg.Record) -> dict:
         "content": row["content"],
         "createdAt": row["created_at"],
     }
-
