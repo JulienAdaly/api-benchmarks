@@ -297,10 +297,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to parse db config: %v", err)
 	}
-	config.MaxConns = 50
-	config.MinConns = 10
-	config.MaxConnIdleTime = 300 * time.Second
-	config.MaxConnLifetime = 1800 * time.Second
+	// Standardized DB pool configuration (can be overridden via environment variables)
+	config.MaxConns = int32(getenvInt("DB_POOL_MAX", 50))
+	config.MinConns = int32(getenvInt("DB_POOL_MIN", 10))
+	config.MaxConnIdleTime = time.Duration(getenvInt("DB_POOL_IDLE_TIMEOUT", 300)) * time.Second
+	config.MaxConnLifetime = time.Duration(getenvInt("DB_POOL_MAX_LIFETIME", 1800)) * time.Second
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
