@@ -23,6 +23,12 @@ docker compose up -f .devcontainer/docker-compose.yml -d db
 cd src/rust-axum && cargo build --release
 ```
 
+### (Optional) Pre-compile go code
+
+```bash
+cd src/go-fiber && go build -o go-fiber
+```
+
 ### Run all the benchmarks
 
 ```bash
