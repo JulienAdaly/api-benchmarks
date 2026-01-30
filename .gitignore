@@ -10,3 +10,4 @@ target
 **/*.txt
 **/*.md
 !**/README.md
+.DS_Store
