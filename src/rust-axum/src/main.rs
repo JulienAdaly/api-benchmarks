@@ -40,16 +40,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_config = AuthConfig::default();
 
-    // Create database connection pool with high-load optimized settings
-    let pool = PgPoolOptions::new()
-        .max_connections(50)  // Increase significantly for 1000 VUs
-        .min_connections(10)  // Keep more connections ready
-        .acquire_timeout(std::time::Duration::from_secs(10))  // Longer timeout
-        .idle_timeout(std::time::Duration::from_secs(300))    // Shorter idle timeout
-        .max_lifetime(std::time::Duration::from_secs(1800))
-        .test_before_acquire(false)  // Skip connection testing for speed
-        .connect(&database_url)
-        .await?;
+    // Standardized DB pool configuration (can be overridden via environment variables)
+    let max_connections = env::var("DB_POOL_MAX")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(50);
+    let min_connections = env::var("DB_POOL_MIN")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(10);
+    let acquire_timeout_secs = env::var("DB_POOL_ACQUIRE_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(10);
+    let idle_timeout_secs = env::var("DB_POOL_IDLE_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(300);
+    let max_lifetime_secs = env::var("DB_POOL_MAX_LIFETIME")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(1800);
+
+    // Retry database connection with exponential backoff
+    // This handles cases where the database might not be fully ready yet
+    let mut retry_delay = 1u64;
+    let mut attempt = 0u32;
+    const MAX_RETRIES: u32 = 10;
+    let pool = loop {
+        attempt += 1;
+        match PgPoolOptions::new()
+            .max_connections(max_connections)
+            .min_connections(min_connections)
+            .acquire_timeout(std::time::Duration::from_secs(acquire_timeout_secs))
+            .idle_timeout(std::time::Duration::from_secs(idle_timeout_secs))
+            .max_lifetime(std::time::Duration::from_secs(max_lifetime_secs))
+            .test_before_acquire(true)  // Test connections before use to handle terminated connections gracefully
+            .connect(&database_url)
+            .await
+        {
+            Ok(pool) => break pool,
+            Err(e) => {
+                if attempt >= MAX_RETRIES {
+                    tracing::error!("Failed to connect to database after {} retries: {}", MAX_RETRIES, e);
+                    return Err(e.into());
+                }
+                tracing::warn!(
+                    "Database connection failed (attempt {}/{}), retrying in {}s: {}",
+                    attempt,
+                    MAX_RETRIES,
+                    retry_delay,
+                    e
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(retry_delay)).await;
+                retry_delay = std::cmp::min(retry_delay * 2, 10); // Exponential backoff, max 10s
+            }
+        }
+    };
 
     // Create app state
     let app_state = AppState {
@@ -86,8 +133,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(app_state);
 
     // Run the server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    tracing::info!("Server running on http://0.0.0.0:8080");
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse::<u16>()
+        .unwrap_or(8080);
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
+    tracing::info!("Server running on http://0.0.0.0:{}", port);
 
     axum::serve(listener, app).await?;
 

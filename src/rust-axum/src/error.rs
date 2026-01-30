@@ -33,7 +33,15 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             AppError::Database(ref e) => {
-                tracing::error!("Database error: {:?}", e);
+                if let sqlx::Error::Database(db_err) = e {
+                    if db_err.code().as_deref() == Some("57P01") {
+                        tracing::debug!("Connection terminated, will retry: {:?}", e);
+                    } else {
+                        tracing::error!("Database error: {:?}", e);
+                    }
+                } else {
+                    tracing::error!("Database error: {:?}", e);
+                }
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
             }
             AppError::Unauthorized(ref message) => (StatusCode::UNAUTHORIZED, message.as_str()),
