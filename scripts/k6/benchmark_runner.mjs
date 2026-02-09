@@ -59,7 +59,7 @@ const IMPLEMENTATIONS = {
     port: 8081,
     path: 'src/java-javalin',
     startCmd:
-      'java -XX:+UseZGC -XX:+ZGenerational -Xmx2g -Xms2g -jar build/libs/java-javalin-all.jar',
+      'java -XX:+UseZGC -Xmx2g -Xms2g -jar build/libs/java-javalin-all.jar',
   },
 };
 

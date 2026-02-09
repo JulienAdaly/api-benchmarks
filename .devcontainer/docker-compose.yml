@@ -404,7 +404,7 @@ services:
         export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
         export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
         export PORT=8081 &&
-        java -XX:+UseZGC -XX:+ZGenerational -Xmx2g -Xms2g -jar build/libs/java-javalin-all.jar
+        java -XX:+UseZGC -Xmx2g -Xms2g -jar build/libs/java-javalin-all.jar
       "
     ports:
       - '8081:8081'
