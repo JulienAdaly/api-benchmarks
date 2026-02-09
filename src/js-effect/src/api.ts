@@ -7,6 +7,7 @@ import {
   BadRequestError,
   NotFoundError,
   ConflictError,
+  InternalServerError,
   PersistenceError,
 } from './errors.js';
 import { AuthMiddleware } from './auth.js';
@@ -69,6 +70,7 @@ const AuthApiGroup = HttpApiGroup.make('auth')
       .addError(UnauthorizedError)
       .middleware(AuthMiddleware)
   )
+  .addError(InternalServerError)
   .addError(PersistenceError);
 
 const UserApiGroup = HttpApiGroup.make('users')
@@ -116,6 +118,7 @@ const UserApiGroup = HttpApiGroup.make('users')
       .addError(ForbiddenError)
   )
   .middleware(AuthMiddleware)
+  .addError(InternalServerError)
   .addError(PersistenceError);
 
 const NewPostSchema = Schema.Struct({

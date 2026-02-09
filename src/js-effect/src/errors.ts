@@ -43,6 +43,20 @@ export class ConflictError extends Schema.TaggedError<ConflictError>(
   HttpApiSchema.annotations({ status: 409 })
 ) {}
 
+export class InternalServerError extends Schema.TaggedError<InternalServerError>(
+  'InternalServerError'
+)(
+  'InternalServerError',
+  { detail: Schema.String },
+  HttpApiSchema.annotations({ status: 500 })
+) {
+  static fromError(error: unknown): InternalServerError {
+    return new InternalServerError({
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export class PersistenceError extends Schema.TaggedError<PersistenceError>(
   'PersistenceError'
 )(

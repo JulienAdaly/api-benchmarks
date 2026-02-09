@@ -1,55 +1,34 @@
 // Password utility that works with both Bun and Node.js
 import { Effect } from 'effect';
+import { InternalServerError } from './errors.js';
 
-// Check if we're running on Bun
-const isBun = typeof Bun !== 'undefined';
+const catchError = (e: unknown) => InternalServerError.fromError(e);
 
-// Lazy load bcryptjs for Node.js (ES module compatible)
-let bcryptjs: typeof import('bcryptjs') | null = null;
-const getBcrypt = async () => {
-  if (!bcryptjs && !isBun) {
-    bcryptjs = await import('bcryptjs');
-  }
-  return bcryptjs;
-};
+const impl: {
+  verify: (password: string, hash: string) => Promise<boolean>;
+  hash: (password: string) => Promise<string>;
+} =
+  typeof Bun !== 'undefined'
+    ? {
+        verify: (password, hash) =>
+          Bun.password.verify(password, hash, 'bcrypt'),
+        hash: password => Bun.password.hash(password, { algorithm: 'bcrypt' }),
+      }
+    : await import('bcryptjs').then(bcrypt => ({
+        verify: (password, hash) => bcrypt.compare(password, hash),
+        hash: password => bcrypt.hash(password, 8),
+      }));
 
 export const verifyPassword = (
   password: string,
   hash: string
-): Effect.Effect<boolean, Error> => {
-  if (isBun) {
-    return Effect.promise(() =>
-      Bun.password.verify(password, hash, 'bcrypt')
-    );
-  } else {
-    // Node.js: use bcryptjs
-    return Effect.promise(async () => {
-      const bcrypt = await getBcrypt();
-      if (!bcrypt) {
-        throw new Error('bcryptjs not available');
-      }
-      return bcrypt.compare(password, hash);
-    });
-  }
-};
+): Effect.Effect<boolean, InternalServerError> =>
+  Effect.tryPromise({
+    try: () => impl.verify(password, hash),
+    catch: catchError,
+  });
 
 export const hashPassword = (
   password: string
-): Effect.Effect<string, Error> => {
-  if (isBun) {
-    return Effect.promise(() =>
-      Bun.password.hash(password, {
-        algorithm: 'bcrypt',
-      })
-    );
-  } else {
-    // Node.js: use bcryptjs
-    return Effect.promise(async () => {
-      const bcrypt = await getBcrypt();
-      if (!bcrypt) {
-        throw new Error('bcryptjs not available');
-      }
-      return bcrypt.hash(password, 8);
-    });
-  }
-};
+): Effect.Effect<string, InternalServerError> =>
+  Effect.tryPromise({ try: () => impl.hash(password), catch: catchError });
