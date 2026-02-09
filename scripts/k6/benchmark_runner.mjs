@@ -33,7 +33,7 @@ const IMPLEMENTATIONS = {
   'python-fastapi': {
     port: 8000,
     path: 'src/python-fastapi',
-    startCmd: 'uv run start_server.py'
+    startCmd: 'uv run start_server.py',
   },
   'go-fiber': {
     port: 8080,
@@ -54,6 +54,12 @@ const IMPLEMENTATIONS = {
     port: 3001,
     path: 'src/js-express',
     startCmd: 'bun run src/main.js',
+  },
+  'java-javalin': {
+    port: 8081,
+    path: 'src/java-javalin',
+    startCmd:
+      'java -XX:+UseZGC -XX:+ZGenerational -Xmx2g -Xms2g -jar build/libs/java-javalin-all.jar',
   },
 };
 
@@ -110,12 +116,12 @@ function loadEnvForImplementation(implAbsPath) {
   if (existsSync(rootEnvPath)) {
     try {
       merged = { ...merged, ...parseDotenv(readFileSync(rootEnvPath, 'utf8')) };
-    } catch { }
+    } catch {}
   }
   if (existsSync(implEnvPath)) {
     try {
       merged = { ...merged, ...parseDotenv(readFileSync(implEnvPath, 'utf8')) };
-    } catch { }
+    } catch {}
   }
   return merged;
 }
@@ -186,14 +192,14 @@ Usage: node scripts/k6/benchmark_runner.mjs [options]
 Options:
   -i, --implementations <list>  Comma-separated list of implementations to test
                                Available: ${Object.keys(IMPLEMENTATIONS).join(
-    ', '
-  )}
+                                 ', '
+                               )}
                                Default: all implementations
 
   -t, --tests <list>           Comma-separated list of test configurations
                                Available: ${TEST_CONFIGS.map(t => t.name).join(
-    ', '
-  )}
+                                 ', '
+                               )}
                                Default: all tests
 
   -o, --output <dir>           Output directory for results (default: benchmark_results)
@@ -293,12 +299,14 @@ async function startImplementation(name, config) {
   // Check if service is already running (e.g., in Docker)
   const alreadyRunning = await isServiceRunning(config.port);
   if (alreadyRunning) {
-    console.log(`✓ ${name} is already running on port ${config.port} (skipping start)`);
+    console.log(
+      `✓ ${name} is already running on port ${config.port} (skipping start)`
+    );
     // Return a dummy handle that indicates the service is already running
     return {
       proc: null,
       processExited: () => false,
-      alreadyRunning: true
+      alreadyRunning: true,
     };
   }
 
@@ -496,8 +504,9 @@ function generateReport(results, outputDir) {
       successful.forEach((result, index) => {
         const medal =
           index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '  ';
-        markdown += `${medal} **${result.implementation
-          }**: ${result.rps.toLocaleString()} RPS\n`;
+        markdown += `${medal} **${
+          result.implementation
+        }**: ${result.rps.toLocaleString()} RPS\n`;
       });
 
       if (successful.length > 1) {
@@ -530,7 +539,8 @@ function generateReport(results, outputDir) {
   results.forEach(result => {
     const status = result.error ? 'failed' : 'success';
     csvLines.push(
-      `${result.implementation},${result.test},${result.vus},${result.duration
+      `${result.implementation},${result.test},${result.vus},${
+        result.duration
       },${result.rps || ''},${status}`
     );
   });
@@ -579,10 +589,16 @@ async function main() {
           try {
             await cleanupConnections(30, process.env.DATABASE_URL);
           } catch (retryError) {
-            console.warn('⚠ PostgreSQL cleanup failed after retry, continuing anyway:', retryError.message);
+            console.warn(
+              '⚠ PostgreSQL cleanup failed after retry, continuing anyway:',
+              retryError.message
+            );
           }
         } else {
-          console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
+          console.warn(
+            '⚠ PostgreSQL cleanup failed, continuing anyway:',
+            error.message
+          );
         }
       }
 
@@ -625,12 +641,16 @@ async function main() {
         }
 
         // Stop implementation (only if we started it and it's still running)
-        if (!implHandle.alreadyRunning && !implHandle.processExited() && implHandle.proc) {
+        if (
+          !implHandle.alreadyRunning &&
+          !implHandle.processExited() &&
+          implHandle.proc
+        ) {
           console.log(`Stopping ${implName}...`);
           implHandle.proc.kill('SIGTERM');
           // Wait longer for server to shut down and close connections gracefully
           await sleep(5000);
-          
+
           // Force kill if still running after graceful shutdown
           if (!implHandle.processExited()) {
             console.log(`Force killing ${implName}...`);
@@ -641,12 +661,17 @@ async function main() {
 
         // Cleanup PostgreSQL connections after stopping implementation
         // Wait a bit longer for connections to close naturally before forcing cleanup
-        console.log('\n🧹 Cleaning up PostgreSQL connections after stopping...');
+        console.log(
+          '\n🧹 Cleaning up PostgreSQL connections after stopping...'
+        );
         await sleep(3000); // Give connections time to close naturally
         try {
           await cleanupConnections(30, process.env.DATABASE_URL);
         } catch (error) {
-          console.warn('⚠ PostgreSQL cleanup failed, continuing anyway:', error.message);
+          console.warn(
+            '⚠ PostgreSQL cleanup failed, continuing anyway:',
+            error.message
+          );
         }
       } catch (error) {
         console.error(`Failed to test ${implName}:`, error.message);
