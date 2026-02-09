@@ -50,14 +50,14 @@ RUN ARCH=$(uname -m) && \
   mv "k6-v1.3.0-linux-${K6_ARCH}/k6" /usr/local/bin/ && \
   rm -rf "k6-v1.3.0-linux-${K6_ARCH}" "k6-v1.3.0-linux-${K6_ARCH}.tar.gz"
 
-# Install Java (Temurin JDK 21) - architecture aware
+# Install Java (Temurin JDK 25) - architecture aware
 RUN ARCH=$(uname -m) && \
   if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
   JAVA_ARCH="aarch64"; \
   else \
   JAVA_ARCH="x64"; \
   fi && \
-  curl -L "https://api.adoptium.net/v3/binary/latest/21/ga/linux/${JAVA_ARCH}/jdk/hotspot/normal/eclipse" -o temurin.tar.gz && \
+  curl -L "https://api.adoptium.net/v3/binary/latest/25/ga/linux/${JAVA_ARCH}/jdk/hotspot/normal/eclipse" -o temurin.tar.gz && \
   mkdir -p /usr/local/java && \
   tar -xzf temurin.tar.gz -C /usr/local/java --strip-components=1 && \
   rm temurin.tar.gz
