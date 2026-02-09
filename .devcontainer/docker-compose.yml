@@ -1,5 +1,5 @@
 services:
-# Shared base image - built once and reused by all backend services
+  # Shared base image - built once and reused by all backend services
   backend_base:
     build:
       context: .
@@ -38,6 +38,8 @@ services:
         condition: service_healthy
       rust-axum:
         condition: service_healthy
+      java-javalin:
+        condition: service_healthy
     volumes:
       - ../..:/workspaces:cached
       - apibench-node_modules:/workspace/node_modules
@@ -66,7 +68,7 @@ services:
       - ../database/migrations:/docker-entrypoint-initdb.d
       - apibench-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -106,7 +108,7 @@ services:
     working_dir: /workspaces/api-benchmarks/src/js-express
     command: sh -c "export PATH=/root/.bun/bin:$$PATH && bun install"
     healthcheck:
-      test: ["CMD-SHELL", "[ -d node_modules ] || exit 1"]
+      test: ['CMD-SHELL', '[ -d node_modules ] || exit 1']
       interval: 5s
       timeout: 60s
       retries: 1
@@ -116,7 +118,7 @@ services:
     working_dir: /workspaces/api-benchmarks/src/js-effect
     command: sh -c "export PATH=/root/.bun/bin:$$PATH && bun install"
     healthcheck:
-      test: ["CMD-SHELL", "[ -d node_modules ] || exit 1"]
+      test: ['CMD-SHELL', '[ -d node_modules ] || exit 1']
       interval: 5s
       timeout: 60s
       retries: 1
@@ -135,7 +137,11 @@ services:
     ports:
       - '8080:8080'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:8080/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -162,7 +168,11 @@ services:
     ports:
       - '3000:3000'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3000/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -189,7 +199,11 @@ services:
     ports:
       - '3002:3002'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3002/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3002/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -216,7 +230,11 @@ services:
     ports:
       - '3001:3001'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3001/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -243,7 +261,11 @@ services:
     ports:
       - '3003:3003'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3003/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3003/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -270,7 +292,11 @@ services:
     ports:
       - '3004:3004'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3004/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3004/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -297,7 +323,11 @@ services:
     ports:
       - '3005:3005'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3005/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:3005/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -317,7 +347,11 @@ services:
     ports:
       - '8000:8000'
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/posts > /dev/null 2>&1 || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'curl -f http://localhost:8000/posts > /dev/null 2>&1 || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -334,7 +368,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       # Standardized DB pool configuration for all backends
       DB_POOL_MAX: ${DB_POOL_MAX:-50}
-      DB_POOL_MIN: 0  # Use lazy connections to avoid connection timeouts on startup
+      DB_POOL_MIN: 0 # Use lazy connections to avoid connection timeouts on startup
       DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-300}
       DB_POOL_MAX_LIFETIME: ${DB_POOL_MAX_LIFETIME:-1800}
       DB_POOL_ACQUIRE_TIMEOUT: ${DB_POOL_ACQUIRE_TIMEOUT:-10}
@@ -349,7 +383,37 @@ services:
     ports:
       - '8082:8080'
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/posts || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:8080/posts || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  java-javalin:
+    <<: *backend_common
+    working_dir: /workspaces/api-benchmarks/src/java-javalin
+    command: >
+      sh -c "
+        export PATH=/usr/local/java/bin:$$PATH &&
+        export JAVA_HOME=/usr/local/java &&
+        ./gradlew --no-daemon shadowJar &&
+        export DATABASE_URL=$${DATABASE_URL:-postgresql://$${POSTGRES_USER:-apibench}:$${POSTGRES_PASSWORD:-apibench_password}@db:5432/$${POSTGRES_DB:-apibench}} &&
+        export JWT_SECRET=$${JWT_SECRET:-dev-secret} &&
+        export PORT=8081 &&
+        java -XX:+UseZGC -XX:+ZGenerational -Xmx2g -Xms2g -jar build/libs/java-javalin-all.jar
+      "
+    ports:
+      - '8081:8081'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget --no-verbose --tries=1 --spider http://localhost:8081/posts || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

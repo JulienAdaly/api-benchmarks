@@ -11,3 +11,9 @@ target
 **/*.md
 !**/README.md
 .DS_Store
+
+# Java
+.gradle
+build
+.idea
+bin
